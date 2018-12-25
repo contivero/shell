@@ -1,0 +1,192 @@
+\documentclass{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage{inconsolata}
+\usepackage{hyperref}
+\hypersetup{pdfauthor={Cristian Adrián Ontivero}}
+\usepackage{listings}
+\lstset{% general command to set parameter(s)
+basicstyle =\small,          % print whole listing small
+keywordstyle=\ttfamily,
+identifierstyle=,           % nothing happens
+commentstyle=\color{white}, % white comments
+stringstyle=\ttfamily,      % typewriter type for strings
+showstringspaces=false     % no special string spaces
+}
+
+\newlength\tindent%
+\setlength{\tindent}{\parindent}
+\setlength{\parindent}{0pt}
+\renewcommand{\indent}{\hspace*{\tindent}}
+
+%Pagination stuff.
+\setlength{\topmargin}{-.3 in}
+\setlength{\oddsidemargin}{0in}
+\setlength{\evensidemargin}{0in}
+\setlength{\textheight}{9.in}
+\setlength{\textwidth}{6.5in}
+\pagestyle{empty}
+
+\begin{document}
+
+\begin{center}
+\Large Bash to POSIX shell cheatsheet
+\end{center}
+
+We will leave aside whether it is better to aim for POSIX compliance, or a
+broader sense of portability (since some POSIX features aren't available
+everywhere). One of the best ways to check for POSIX compliance is using
+shellcheck on a script with the shebang {\tt \#!/bin/sh}. Unfortunately, the
+documentation doesn't cover how to translate every ``bashism''. What follows is
+in no way exhaustive.
+
+Take only the first letter (Haskell's {\tt head}):
+
+\begin{minipage}{.5\textwidth}
+\begin{lstlisting}[language=sh]
+"${string:0:1}"
+\end{lstlisting}
+\end{minipage}%
+\begin{minipage}{.5\textwidth}
+\begin{lstlisting}[language=bash]
+  "$(echo "$string" | cut -c1)"
+\end{lstlisting}
+\end{minipage}
+
+Take from the second letter onwards (Haskell's {\tt tail}):
+
+\begin{minipage}{.5\textwidth}
+\begin{lstlisting}[language=sh]
+"${string:1:}"
+\end{lstlisting}
+\end{minipage}%
+\begin{minipage}{.5\textwidth}
+\begin{lstlisting}[language=bash]
+  "$(echo "$string" | cut -c2-)"
+\end{lstlisting}
+\end{minipage}
+
+To take a substring, say the first three letters:
+
+\begin{minipage}{.5\textwidth}
+\begin{lstlisting}[language=sh]
+"${string:1:}"
+\end{lstlisting}
+\end{minipage}%
+\begin{minipage}{.5\textwidth}
+\begin{lstlisting}[language=bash]
+"$(echo "$string" | cut -c1-4)"
+\end{lstlisting}
+\end{minipage}
+
+Take the last letter (Haskell's {\tt last}):
+
+\begin{minipage}{.5\textwidth}
+\begin{lstlisting}[language=sh]
+"${string:-1}"
+\end{lstlisting}
+\end{minipage}%
+\begin{minipage}{.5\textwidth}
+\begin{lstlisting}[language=bash]
+"$(printf %s "$string" | tail -c 1)"
+\end{lstlisting}
+\end{minipage}
+
+POSIX's {\tt echo} doesn't take any flags. In contrast, Bash's {\tt echo}
+builtin does. To disable the newline, we can use {\tt echo -n} in Bash. The
+portable POSIX way is using {\tt printf}:
+
+\begin{minipage}[b]{.5\textwidth}
+\begin{lstlisting}[language=sh]
+echo -n 'No trailing newline'
+\end{lstlisting}
+\end{minipage}%
+\begin{minipage}[b]{.5\textwidth}
+\begin{lstlisting}[language=bash]
+  printf %s 'No trailing newline'
+\end{lstlisting}
+\end{minipage}
+
+In Bash, the {\tt -e} flags enables the interpretation of backslash escapes.
+What's more, even among some of the main shells the defaults difer, for instance
+Bash's {\tt echo} doesn't interpret escapes by default, but Zsh does. It is
+preferable to use {\tt printf} as a portable alternative. When we want to
+interpret escapes we use {\tt \%b}; when we don't, {\tt \%s}.
+
+\begin{minipage}[b]{.5\textwidth}
+\begin{lstlisting}[language=sh]
+echo -e "Some\n\nText"
+echo -E "Some\n\nText"
+\end{lstlisting}
+\end{minipage}%
+\begin{minipage}[b]{.5\textwidth}
+\begin{lstlisting}[language=bash]
+printf '%b\n' -e "Some\n\nText"
+printf '%s\n' -E "Some\n\nText"
+\end{lstlisting}
+\end{minipage}
+
+Bash's {\tt read} builtin has the {\tt -s} flag which enables ``Silent Mode'': whatever is
+input by the user isn't displayed. This is particularly useful when reading a
+password. The {\tt -s} flag isn't part of the POSIX standard, but the same
+effect can be achieved using {\tt stty}, which is part of POSIX:
+
+\begin{minipage}[b]{.5\textwidth}
+\begin{lstlisting}[language=sh]
+read -s password
+\end{lstlisting}
+\end{minipage}%
+\begin{minipage}[b]{.5\textwidth}
+\begin{lstlisting}[language=bash]
+stty -echo
+read -s password
+stty echo
+\end{lstlisting}
+\end{minipage}
+
+Bash's {\tt read} builtin has the {\tt -p} flag, which displays a
+\textit{prompt} (without a trailing newline), before reading input. The same can
+be achieved in POSIX by simply printing before calling {\tt read}:
+
+\begin{minipage}[t]{.5\textwidth}
+\begin{lstlisting}[language=sh]
+read -p 'Continue? [y/n] ' yn
+\end{lstlisting}
+\end{minipage}%
+\begin{minipage}[t]{.5\textwidth}
+\begin{lstlisting}[language=bash]
+printf %s 'Continue? [y/n] '
+read yn
+\end{lstlisting}
+\end{minipage}
+
+POSIX compatible utility functions
+
+\begin{lstlisting}[language=bash]
+to_upper() { echo "$1" | tr '[:lower:]' '[:upper:]'; }
+
+case_insensitive_match() {
+  if [ "$(to_upper "$1")" = "$(to_upper "$2")" ]; then
+    return 0
+  fi
+  return 1
+}
+
+str_head() { echo "$1" | cut -c1; }
+
+str_tail() { echo "$1" | cut -c2- ; }
+
+capitalize() {
+  echo "$(to_upper "$(str_head "$first_word")")$(str_tail "$first_word")"
+}
+
+nub () { printf %b "$1" | sort | uniq ; }
+\end{lstlisting}
+
+\newpage 
+\bibliography{refs}
+\bibliographystyle{unsrt}
+
+\end{document}
+
+
